@@ -2,27 +2,24 @@ const express = require('express');
 const router = express.Router();
 const { dbAll, dbRun, dbGet } = require('../database/db');
 const { requireAdmin } = require('../middleware/auth');
+const { nowTijuana } = require('../database/db');
 
-// Auto-cleanup records older than 7 days
+// Eliminar registros con más de 7 días (comparando en hora local Tijuana)
 async function cleanOldRecords() {
-  await dbRun(
-    "DELETE FROM registros WHERE fecha_hora < datetime('now', '-7 days')"
-  );
+  const cutoff = new Date(Date.now() - 7 * 24 * 60 * 60 * 1000)
+    .toLocaleString('sv-SE', { timeZone: 'America/Tijuana' });
+  await dbRun('DELETE FROM registros WHERE fecha_hora < ?', [cutoff]);
 }
 
-// GET /api/admin/records - Get all records (last 7 days)
 router.get('/records', requireAdmin, async (req, res) => {
   try {
     await cleanOldRecords();
 
     const records = await dbAll(`
-      SELECT 
-        id,
-        gpid,
-        hhc,
-        turno,
-        date(fecha_hora) as fecha,
-        time(fecha_hora) as hora,
+      SELECT
+        id, gpid, hhc, turno,
+        substr(fecha_hora, 1, 10) as fecha,
+        substr(fecha_hora, 12, 5) as hora,
         fecha_hora
       FROM registros
       ORDER BY fecha_hora DESC
@@ -35,7 +32,6 @@ router.get('/records', requireAdmin, async (req, res) => {
   }
 });
 
-// GET /api/admin/users - Get all users with status
 router.get('/users', requireAdmin, async (req, res) => {
   try {
     const users = await dbAll(`
@@ -76,7 +72,6 @@ router.get('/users', requireAdmin, async (req, res) => {
   }
 });
 
-// POST /api/admin/users - Create a new user
 router.post('/users', requireAdmin, async (req, res) => {
   try {
     const bcrypt = require('bcryptjs');
@@ -99,8 +94,8 @@ router.post('/users', requireAdmin, async (req, res) => {
 
     const hash = await bcrypt.hash(password, 12);
     await dbRun(
-      'INSERT INTO usuarios (gpid, password, rol) VALUES (?, ?, ?)',
-      [gpid, hash, rol]
+      'INSERT INTO usuarios (gpid, password, rol, creado_en) VALUES (?, ?, ?, ?)',
+      [gpid, hash, rol, nowTijuana()]
     );
 
     res.json({ success: true, message: 'Usuario creado correctamente' });
@@ -110,12 +105,10 @@ router.post('/users', requireAdmin, async (req, res) => {
   }
 });
 
-// DELETE /api/admin/users/:gpid - Delete a user
 router.delete('/users/:gpid', requireAdmin, async (req, res) => {
   try {
     const { gpid } = req.params;
-    
-    // Prevent self-deletion
+
     if (gpid === req.user.gpid) {
       return res.status(400).json({ error: 'No puedes eliminar tu propio usuario' });
     }
@@ -130,7 +123,6 @@ router.delete('/users/:gpid', requireAdmin, async (req, res) => {
   }
 });
 
-// PATCH /api/admin/users/:gpid/unblock - Manually unblock a user
 router.patch('/users/:gpid/unblock', requireAdmin, async (req, res) => {
   try {
     const { gpid } = req.params;
