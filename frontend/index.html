@@ -1,0 +1,1550 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Sistema de Control GPID</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@300;400;500;700&family=Barlow+Condensed:wght@300;400;600;700&family=Barlow:wght@300;400;500&display=swap" rel="stylesheet">
+<style>
+  :root {
+    --bg: #0a0c0f;
+    --surface: #111318;
+    --surface2: #191d24;
+    --surface3: #1f242d;
+    --border: #2a3040;
+    --border2: #353d4e;
+    --accent: #00d4ff;
+    --accent2: #0099bb;
+    --accent-dim: rgba(0,212,255,0.08);
+    --accent-dim2: rgba(0,212,255,0.15);
+    --success: #00e676;
+    --warning: #ffd740;
+    --danger: #ff5252;
+    --danger-dim: rgba(255,82,82,0.1);
+    --text: #e8edf5;
+    --text2: #8896aa;
+    --text3: #5a6478;
+    --mono: 'JetBrains Mono', monospace;
+    --cond: 'Barlow Condensed', sans-serif;
+    --body: 'Barlow', sans-serif;
+  }
+
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+
+  body {
+    background: var(--bg);
+    color: var(--text);
+    font-family: var(--body);
+    min-height: 100vh;
+    overflow-x: hidden;
+  }
+
+  /* ─── GRID BACKGROUND ─── */
+  body::before {
+    content: '';
+    position: fixed;
+    inset: 0;
+    background-image:
+      linear-gradient(rgba(0,212,255,0.03) 1px, transparent 1px),
+      linear-gradient(90deg, rgba(0,212,255,0.03) 1px, transparent 1px);
+    background-size: 40px 40px;
+    pointer-events: none;
+    z-index: 0;
+  }
+
+  /* ─── VIEWS ─── */
+  .view { display: none; position: relative; z-index: 1; }
+  .view.active { display: block; }
+
+  /* ════════════════════════════════════
+     LOGIN VIEW
+  ════════════════════════════════════ */
+  #view-login {
+    min-height: 100vh;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    padding: 20px;
+  }
+
+  .login-container {
+    width: 100%;
+    max-width: 420px;
+  }
+
+  .login-brand {
+    margin-bottom: 40px;
+    text-align: center;
+  }
+
+  .login-brand .logo-mark {
+    width: 56px;
+    height: 56px;
+    border: 2px solid var(--accent);
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    margin-bottom: 20px;
+    position: relative;
+    clip-path: polygon(12px 0, 100% 0, 100% calc(100% - 12px), calc(100% - 12px) 100%, 0 100%, 0 12px);
+  }
+
+  .login-brand .logo-mark::before {
+    content: '';
+    position: absolute;
+    inset: 4px;
+    background: var(--accent-dim);
+    clip-path: polygon(8px 0, 100% 0, 100% calc(100% - 8px), calc(100% - 8px) 100%, 0 100%, 0 8px);
+  }
+
+  .login-brand .logo-mark svg {
+    width: 24px;
+    height: 24px;
+    color: var(--accent);
+    position: relative;
+    z-index: 1;
+  }
+
+  .login-brand h1 {
+    font-family: var(--cond);
+    font-size: 28px;
+    font-weight: 700;
+    letter-spacing: 0.12em;
+    text-transform: uppercase;
+    color: var(--text);
+  }
+
+  .login-brand p {
+    font-family: var(--mono);
+    font-size: 11px;
+    color: var(--text3);
+    letter-spacing: 0.2em;
+    text-transform: uppercase;
+    margin-top: 6px;
+  }
+
+  .login-card {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    padding: 36px;
+    position: relative;
+  }
+
+  .login-card::before {
+    content: '';
+    position: absolute;
+    top: 0; left: 0; right: 0;
+    height: 2px;
+    background: linear-gradient(90deg, transparent, var(--accent), transparent);
+  }
+
+  .card-label {
+    font-family: var(--mono);
+    font-size: 10px;
+    color: var(--text3);
+    letter-spacing: 0.25em;
+    text-transform: uppercase;
+    margin-bottom: 24px;
+    display: flex;
+    align-items: center;
+    gap: 10px;
+  }
+
+  .card-label::after {
+    content: '';
+    flex: 1;
+    height: 1px;
+    background: var(--border);
+  }
+
+  .field {
+    margin-bottom: 20px;
+  }
+
+  .field label {
+    display: block;
+    font-family: var(--mono);
+    font-size: 10px;
+    letter-spacing: 0.2em;
+    text-transform: uppercase;
+    color: var(--text3);
+    margin-bottom: 8px;
+  }
+
+  .input-wrap {
+    position: relative;
+  }
+
+  .input-wrap input {
+    width: 100%;
+    background: var(--surface2);
+    border: 1px solid var(--border);
+    color: var(--text);
+    font-family: var(--mono);
+    font-size: 14px;
+    padding: 12px 16px;
+    outline: none;
+    transition: border-color 0.2s, background 0.2s;
+    letter-spacing: 0.05em;
+  }
+
+  .input-wrap input:focus {
+    border-color: var(--accent);
+    background: var(--surface3);
+  }
+
+  .input-wrap input::placeholder {
+    color: var(--text3);
+    font-size: 12px;
+  }
+
+  .input-hint {
+    font-family: var(--mono);
+    font-size: 10px;
+    color: var(--text3);
+    margin-top: 6px;
+    letter-spacing: 0.05em;
+  }
+
+  .field-error {
+    font-family: var(--mono);
+    font-size: 10px;
+    color: var(--danger);
+    margin-top: 6px;
+    display: none;
+  }
+
+  .field-error.visible { display: block; }
+
+  .btn-primary {
+    width: 100%;
+    background: transparent;
+    border: 1px solid var(--accent);
+    color: var(--accent);
+    font-family: var(--cond);
+    font-size: 14px;
+    font-weight: 600;
+    letter-spacing: 0.2em;
+    text-transform: uppercase;
+    padding: 14px;
+    cursor: pointer;
+    transition: all 0.2s;
+    position: relative;
+    overflow: hidden;
+    margin-top: 8px;
+  }
+
+  .btn-primary::before {
+    content: '';
+    position: absolute;
+    inset: 0;
+    background: var(--accent-dim);
+    transform: translateX(-100%);
+    transition: transform 0.3s;
+  }
+
+  .btn-primary:hover::before { transform: translateX(0); }
+  .btn-primary:hover { box-shadow: 0 0 20px rgba(0,212,255,0.2); }
+  .btn-primary:active { transform: scale(0.99); }
+  .btn-primary:disabled { opacity: 0.4; cursor: not-allowed; }
+
+  .btn-primary span { position: relative; z-index: 1; }
+
+  /* Alert box */
+  .alert {
+    padding: 12px 16px;
+    margin-bottom: 20px;
+    font-family: var(--mono);
+    font-size: 12px;
+    display: none;
+    line-height: 1.5;
+  }
+
+  .alert.visible { display: block; }
+  .alert.error { background: var(--danger-dim); border: 1px solid rgba(255,82,82,0.3); color: var(--danger); }
+  .alert.success { background: rgba(0,230,118,0.08); border: 1px solid rgba(0,230,118,0.3); color: var(--success); }
+  .alert.warning { background: rgba(255,215,64,0.08); border: 1px solid rgba(255,215,64,0.3); color: var(--warning); }
+
+  /* ════════════════════════════════════
+     TOP NAV
+  ════════════════════════════════════ */
+  .topbar {
+    background: var(--surface);
+    border-bottom: 1px solid var(--border);
+    padding: 0 32px;
+    height: 56px;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    position: sticky;
+    top: 0;
+    z-index: 100;
+  }
+
+  .topbar-left {
+    display: flex;
+    align-items: center;
+    gap: 16px;
+  }
+
+  .topbar-logo {
+    font-family: var(--cond);
+    font-size: 16px;
+    font-weight: 700;
+    letter-spacing: 0.15em;
+    text-transform: uppercase;
+    color: var(--accent);
+  }
+
+  .topbar-divider {
+    width: 1px;
+    height: 24px;
+    background: var(--border);
+  }
+
+  .topbar-role {
+    font-family: var(--mono);
+    font-size: 11px;
+    color: var(--text3);
+    letter-spacing: 0.1em;
+  }
+
+  .topbar-gpid {
+    font-family: var(--mono);
+    font-size: 13px;
+    color: var(--text2);
+    background: var(--surface2);
+    padding: 4px 10px;
+    border: 1px solid var(--border);
+    letter-spacing: 0.1em;
+  }
+
+  .btn-logout {
+    background: transparent;
+    border: 1px solid var(--border);
+    color: var(--text3);
+    font-family: var(--mono);
+    font-size: 11px;
+    letter-spacing: 0.15em;
+    text-transform: uppercase;
+    padding: 7px 14px;
+    cursor: pointer;
+    transition: all 0.2s;
+  }
+
+  .btn-logout:hover {
+    border-color: var(--danger);
+    color: var(--danger);
+  }
+
+  /* ════════════════════════════════════
+     USER FORM VIEW
+  ════════════════════════════════════ */
+  #view-user {
+    min-height: calc(100vh - 56px);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    padding: 40px 20px;
+  }
+
+  #view-user.active { display: flex; }
+
+  .form-container {
+    width: 100%;
+    max-width: 480px;
+  }
+
+  .form-header {
+    margin-bottom: 32px;
+  }
+
+  .form-header .tag {
+    font-family: var(--mono);
+    font-size: 10px;
+    color: var(--accent);
+    letter-spacing: 0.3em;
+    text-transform: uppercase;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    margin-bottom: 12px;
+  }
+
+  .form-header .tag::before {
+    content: '';
+    width: 16px;
+    height: 1px;
+    background: var(--accent);
+  }
+
+  .form-header h2 {
+    font-family: var(--cond);
+    font-size: 32px;
+    font-weight: 700;
+    letter-spacing: 0.04em;
+    text-transform: uppercase;
+    line-height: 1;
+  }
+
+  .form-card {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    padding: 32px;
+    position: relative;
+  }
+
+  .form-card::before {
+    content: '';
+    position: absolute;
+    top: 0; left: 0;
+    width: 3px;
+    height: 100%;
+    background: linear-gradient(180deg, var(--accent), transparent);
+  }
+
+  /* Turno selector */
+  .turno-grid {
+    display: grid;
+    grid-template-columns: repeat(3, 1fr);
+    gap: 8px;
+    margin-top: 2px;
+  }
+
+  .turno-btn {
+    background: var(--surface2);
+    border: 1px solid var(--border);
+    color: var(--text2);
+    font-family: var(--mono);
+    font-size: 12px;
+    padding: 12px 8px;
+    cursor: pointer;
+    transition: all 0.2s;
+    text-align: center;
+    letter-spacing: 0.05em;
+  }
+
+  .turno-btn:hover {
+    border-color: var(--accent);
+    color: var(--accent);
+    background: var(--accent-dim);
+  }
+
+  .turno-btn.selected {
+    background: var(--accent-dim2);
+    border-color: var(--accent);
+    color: var(--accent);
+    box-shadow: inset 0 0 0 1px var(--accent);
+  }
+
+  .turno-number {
+    display: block;
+    font-size: 22px;
+    font-weight: 700;
+    font-family: var(--cond);
+    line-height: 1;
+    margin-bottom: 4px;
+  }
+
+  .turno-label {
+    font-size: 10px;
+    text-transform: uppercase;
+    letter-spacing: 0.15em;
+  }
+
+  /* ════════════════════════════════════
+     ADMIN VIEW
+  ════════════════════════════════════ */
+  #view-admin {
+    padding: 32px;
+    min-height: calc(100vh - 56px);
+  }
+
+  .admin-grid {
+    display: grid;
+    grid-template-columns: 1fr 380px;
+    gap: 24px;
+    max-width: 1400px;
+    margin: 0 auto;
+  }
+
+  @media (max-width: 1024px) {
+    .admin-grid { grid-template-columns: 1fr; }
+  }
+
+  .panel {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    overflow: hidden;
+  }
+
+  .panel-head {
+    padding: 16px 20px;
+    border-bottom: 1px solid var(--border);
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    background: var(--surface2);
+  }
+
+  .panel-title {
+    font-family: var(--cond);
+    font-size: 13px;
+    font-weight: 600;
+    letter-spacing: 0.2em;
+    text-transform: uppercase;
+    color: var(--text);
+    display: flex;
+    align-items: center;
+    gap: 10px;
+  }
+
+  .panel-title .dot {
+    width: 6px;
+    height: 6px;
+    background: var(--accent);
+    border-radius: 50%;
+  }
+
+  .panel-meta {
+    font-family: var(--mono);
+    font-size: 10px;
+    color: var(--text3);
+    letter-spacing: 0.1em;
+  }
+
+  .panel-body {
+    padding: 0;
+    overflow-x: auto;
+  }
+
+  /* Table */
+  table {
+    width: 100%;
+    border-collapse: collapse;
+    font-size: 13px;
+  }
+
+  thead tr {
+    background: var(--surface3);
+    border-bottom: 1px solid var(--border);
+  }
+
+  thead th {
+    font-family: var(--mono);
+    font-size: 10px;
+    letter-spacing: 0.2em;
+    text-transform: uppercase;
+    color: var(--text3);
+    padding: 10px 16px;
+    text-align: left;
+    font-weight: 400;
+    white-space: nowrap;
+  }
+
+  tbody tr {
+    border-bottom: 1px solid var(--border);
+    transition: background 0.15s;
+  }
+
+  tbody tr:last-child { border-bottom: none; }
+  tbody tr:hover { background: var(--accent-dim); }
+
+  tbody td {
+    padding: 11px 16px;
+    font-family: var(--mono);
+    font-size: 12px;
+    color: var(--text2);
+    white-space: nowrap;
+  }
+
+  .td-gpid {
+    color: var(--accent);
+    font-weight: 500;
+    letter-spacing: 0.1em;
+  }
+
+  .td-turno {
+    font-family: var(--cond);
+    font-size: 13px;
+    font-weight: 600;
+    letter-spacing: 0.05em;
+    color: var(--text);
+  }
+
+  .badge {
+    display: inline-flex;
+    align-items: center;
+    gap: 5px;
+    padding: 3px 8px;
+    font-family: var(--mono);
+    font-size: 10px;
+    letter-spacing: 0.1em;
+    text-transform: uppercase;
+    border-radius: 2px;
+  }
+
+  .badge-available {
+    background: rgba(0,230,118,0.1);
+    color: var(--success);
+    border: 1px solid rgba(0,230,118,0.25);
+  }
+
+  .badge-blocked {
+    background: var(--danger-dim);
+    color: var(--danger);
+    border: 1px solid rgba(255,82,82,0.25);
+  }
+
+  .badge-admin {
+    background: rgba(0,212,255,0.08);
+    color: var(--accent);
+    border: 1px solid rgba(0,212,255,0.2);
+  }
+
+  .badge::before {
+    content: '';
+    width: 4px;
+    height: 4px;
+    border-radius: 50%;
+    background: currentColor;
+  }
+
+  .empty-state {
+    padding: 48px;
+    text-align: center;
+  }
+
+  .empty-state p {
+    font-family: var(--mono);
+    font-size: 12px;
+    color: var(--text3);
+    letter-spacing: 0.1em;
+  }
+
+  /* Admin toolbar */
+  .admin-toolbar {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    padding: 16px 20px;
+    border-bottom: 1px solid var(--border);
+    flex-wrap: wrap;
+  }
+
+  .btn-small {
+    background: transparent;
+    border: 1px solid var(--border);
+    color: var(--text3);
+    font-family: var(--mono);
+    font-size: 10px;
+    letter-spacing: 0.15em;
+    text-transform: uppercase;
+    padding: 6px 12px;
+    cursor: pointer;
+    transition: all 0.2s;
+    display: flex;
+    align-items: center;
+    gap: 6px;
+  }
+
+  .btn-small:hover { border-color: var(--accent2); color: var(--accent); }
+
+  .btn-danger-sm {
+    border-color: rgba(255,82,82,0.3);
+    color: var(--danger);
+  }
+
+  .btn-danger-sm:hover {
+    border-color: var(--danger);
+    background: var(--danger-dim);
+    color: var(--danger);
+  }
+
+  .btn-success-sm {
+    border-color: rgba(0,230,118,0.3);
+    color: var(--success);
+  }
+
+  .btn-success-sm:hover {
+    border-color: var(--success);
+    background: rgba(0,230,118,0.08);
+  }
+
+  .record-count {
+    margin-left: auto;
+    font-family: var(--mono);
+    font-size: 11px;
+    color: var(--text3);
+  }
+
+  /* New user modal */
+  .modal-overlay {
+    position: fixed;
+    inset: 0;
+    background: rgba(0,0,0,0.7);
+    z-index: 200;
+    display: none;
+    align-items: center;
+    justify-content: center;
+    backdrop-filter: blur(4px);
+  }
+
+  .modal-overlay.open { display: flex; }
+
+  .modal {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    width: 100%;
+    max-width: 400px;
+    padding: 0;
+    position: relative;
+  }
+
+  .modal::before {
+    content: '';
+    position: absolute;
+    top: 0; left: 0; right: 0;
+    height: 2px;
+    background: linear-gradient(90deg, transparent, var(--accent), transparent);
+  }
+
+  .modal-header {
+    padding: 20px 24px;
+    border-bottom: 1px solid var(--border);
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+  }
+
+  .modal-header h3 {
+    font-family: var(--cond);
+    font-size: 16px;
+    font-weight: 600;
+    letter-spacing: 0.15em;
+    text-transform: uppercase;
+  }
+
+  .modal-close {
+    background: none;
+    border: none;
+    color: var(--text3);
+    cursor: pointer;
+    font-size: 18px;
+    line-height: 1;
+    transition: color 0.2s;
+  }
+
+  .modal-close:hover { color: var(--danger); }
+
+  .modal-body { padding: 24px; }
+
+  .role-select {
+    width: 100%;
+    background: var(--surface2);
+    border: 1px solid var(--border);
+    color: var(--text);
+    font-family: var(--mono);
+    font-size: 13px;
+    padding: 12px 16px;
+    outline: none;
+    cursor: pointer;
+    transition: border-color 0.2s;
+    appearance: none;
+    -webkit-appearance: none;
+  }
+
+  .role-select:focus { border-color: var(--accent); }
+
+  /* Stats row */
+  .stats-row {
+    display: grid;
+    grid-template-columns: repeat(3, 1fr);
+    gap: 1px;
+    background: var(--border);
+    border-bottom: 1px solid var(--border);
+  }
+
+  .stat-item {
+    background: var(--surface2);
+    padding: 16px 20px;
+  }
+
+  .stat-value {
+    font-family: var(--cond);
+    font-size: 28px;
+    font-weight: 700;
+    color: var(--accent);
+    line-height: 1;
+    margin-bottom: 4px;
+  }
+
+  .stat-label {
+    font-family: var(--mono);
+    font-size: 10px;
+    color: var(--text3);
+    letter-spacing: 0.15em;
+    text-transform: uppercase;
+  }
+
+  /* Loading spinner */
+  .spinner {
+    width: 16px;
+    height: 16px;
+    border: 2px solid var(--border);
+    border-top-color: var(--accent);
+    border-radius: 50%;
+    animation: spin 0.7s linear infinite;
+    display: inline-block;
+  }
+
+  @keyframes spin { to { transform: rotate(360deg); } }
+
+  /* Countdown */
+  .countdown {
+    font-family: var(--mono);
+    font-size: 11px;
+    color: var(--warning);
+    letter-spacing: 0.05em;
+  }
+
+  /* Toast */
+  .toast {
+    position: fixed;
+    bottom: 24px;
+    right: 24px;
+    background: var(--surface);
+    border: 1px solid var(--border);
+    padding: 14px 20px;
+    font-family: var(--mono);
+    font-size: 12px;
+    z-index: 999;
+    transform: translateY(80px);
+    opacity: 0;
+    transition: all 0.3s;
+    max-width: 320px;
+    line-height: 1.4;
+  }
+
+  .toast.show { transform: translateY(0); opacity: 1; }
+  .toast.toast-success { border-left: 3px solid var(--success); color: var(--success); }
+  .toast.toast-error { border-left: 3px solid var(--danger); color: var(--danger); }
+  .toast.toast-warning { border-left: 3px solid var(--warning); color: var(--warning); }
+
+  /* Scrollbar */
+  ::-webkit-scrollbar { width: 6px; height: 6px; }
+  ::-webkit-scrollbar-track { background: var(--surface); }
+  ::-webkit-scrollbar-thumb { background: var(--border2); border-radius: 3px; }
+  ::-webkit-scrollbar-thumb:hover { background: var(--accent2); }
+
+  /* Animations */
+  @keyframes fadeIn {
+    from { opacity: 0; transform: translateY(16px); }
+    to { opacity: 1; transform: translateY(0); }
+  }
+
+  .login-card, .form-card { animation: fadeIn 0.4s ease both; }
+
+  /* Responsive */
+  @media (max-width: 640px) {
+    .topbar { padding: 0 16px; }
+    #view-admin { padding: 16px; }
+    .stats-row { grid-template-columns: 1fr 1fr; }
+    .admin-toolbar { gap: 8px; }
+  }
+</style>
+</head>
+<body>
+
+<!-- ═══════════════════════════════════
+     VIEW: LOGIN
+═══════════════════════════════════ -->
+<div id="view-login" class="view active">
+  <div class="login-container">
+    <div class="login-brand">
+      <div class="logo-mark">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+          <path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/>
+        </svg>
+      </div>
+      <h1>Control GPID</h1>
+      <p>Sistema de Acceso Seguro</p>
+    </div>
+
+    <div class="login-card">
+      <div class="card-label">Autenticación</div>
+
+      <div id="login-alert" class="alert"></div>
+
+      <div class="field">
+        <label for="input-gpid">GPID</label>
+        <div class="input-wrap">
+          <input type="text" id="input-gpid" maxlength="8" placeholder="12345678" inputmode="numeric" autocomplete="username">
+        </div>
+        <div class="input-hint">8 dígitos numéricos</div>
+        <div class="field-error" id="gpid-error">El GPID debe ser exactamente 8 dígitos numéricos</div>
+      </div>
+
+      <div class="field">
+        <label for="input-password">Contraseña</label>
+        <div class="input-wrap">
+          <input type="password" id="input-password" placeholder="••••••••" autocomplete="current-password">
+        </div>
+        <div class="field-error" id="pass-error">La contraseña es requerida</div>
+      </div>
+
+      <button class="btn-primary" id="btn-login" onclick="handleLogin()">
+        <span id="btn-login-text">Entrar</span>
+      </button>
+    </div>
+  </div>
+</div>
+
+<!-- ═══════════════════════════════════
+     VIEW: USER (Normal user form)
+═══════════════════════════════════ -->
+<div id="view-user" class="view">
+  <div style="position:fixed;top:0;left:0;right:0;z-index:100">
+    <div class="topbar">
+      <div class="topbar-left">
+        <div class="topbar-logo">GPID Control</div>
+        <div class="topbar-divider"></div>
+        <div class="topbar-role">Usuario</div>
+      </div>
+      <div style="display:flex;align-items:center;gap:12px">
+        <span class="topbar-gpid" id="user-gpid-display">—</span>
+        <button class="btn-logout" onclick="handleLogout()">Salir</button>
+      </div>
+    </div>
+  </div>
+
+  <div class="form-container" style="margin-top:56px">
+    <div class="form-header">
+      <div class="tag">Registro de Turno</div>
+      <h2>Nuevo<br>Registro</h2>
+    </div>
+
+    <div class="form-card">
+      <div id="user-alert" class="alert"></div>
+
+      <div class="field">
+        <label for="input-hhc">Número de HHC</label>
+        <div class="input-wrap">
+          <input type="text" id="input-hhc" placeholder="Ingresa el número de HHC">
+        </div>
+        <div class="field-error" id="hhc-error">El número de HHC es requerido</div>
+      </div>
+
+      <div class="field">
+        <label>Turno</label>
+        <div class="turno-grid">
+          <button class="turno-btn" data-turno="Turno 1" onclick="selectTurno(this)">
+            <span class="turno-number">1</span>
+            <span class="turno-label">Turno</span>
+          </button>
+          <button class="turno-btn" data-turno="Turno 2" onclick="selectTurno(this)">
+            <span class="turno-number">2</span>
+            <span class="turno-label">Turno</span>
+          </button>
+          <button class="turno-btn" data-turno="Turno 3" onclick="selectTurno(this)">
+            <span class="turno-number">3</span>
+            <span class="turno-label">Turno</span>
+          </button>
+        </div>
+        <div class="field-error" id="turno-error">Debes seleccionar un turno</div>
+      </div>
+
+      <button class="btn-primary" id="btn-save" onclick="handleSaveRecord()" style="margin-top:16px">
+        <span id="btn-save-text">Guardar Registro</span>
+      </button>
+    </div>
+  </div>
+</div>
+
+<!-- ═══════════════════════════════════
+     VIEW: ADMIN
+═══════════════════════════════════ -->
+<div id="view-admin" class="view">
+  <div style="position:fixed;top:0;left:0;right:0;z-index:100">
+    <div class="topbar">
+      <div class="topbar-left">
+        <div class="topbar-logo">GPID Control</div>
+        <div class="topbar-divider"></div>
+        <div class="topbar-role" style="color:var(--accent)">Administrador</div>
+      </div>
+      <div style="display:flex;align-items:center;gap:12px">
+        <span class="topbar-gpid" id="admin-gpid-display">—</span>
+        <button class="btn-logout" onclick="handleLogout()">Salir</button>
+      </div>
+    </div>
+  </div>
+
+  <div style="padding-top:56px">
+    <div class="admin-grid">
+
+      <!-- Records panel -->
+      <div class="panel">
+        <div class="panel-head">
+          <div class="panel-title">
+            <span class="dot"></span>
+            Registros de Usuarios
+          </div>
+          <div style="display:flex;align-items:center;gap:8px">
+            <div class="panel-meta" id="records-meta">Últimos 7 días</div>
+            <button class="btn-small" onclick="loadAdminData()">↺ Actualizar</button>
+          </div>
+        </div>
+
+        <div class="stats-row" id="admin-stats">
+          <div class="stat-item">
+            <div class="stat-value" id="stat-total">—</div>
+            <div class="stat-label">Total Registros</div>
+          </div>
+          <div class="stat-item">
+            <div class="stat-value" id="stat-today">—</div>
+            <div class="stat-label">Hoy</div>
+          </div>
+          <div class="stat-item">
+            <div class="stat-value" id="stat-blocked">—</div>
+            <div class="stat-label">Bloqueados</div>
+          </div>
+        </div>
+
+        <div class="panel-body">
+          <div id="records-loading" class="empty-state"><span class="spinner"></span></div>
+          <table id="records-table" style="display:none">
+            <thead>
+              <tr>
+                <th>GPID</th>
+                <th>HHC</th>
+                <th>Turno</th>
+                <th>Fecha</th>
+                <th>Hora</th>
+              </tr>
+            </thead>
+            <tbody id="records-tbody"></tbody>
+          </table>
+          <div id="records-empty" class="empty-state" style="display:none">
+            <p>No hay registros en los últimos 7 días</p>
+          </div>
+        </div>
+      </div>
+
+      <!-- Users panel -->
+      <div class="panel">
+        <div class="panel-head">
+          <div class="panel-title">
+            <span class="dot" style="background:var(--warning)"></span>
+            Usuarios del Sistema
+          </div>
+          <button class="btn-small btn-success-sm" onclick="openAddUser()">+ Agregar</button>
+        </div>
+
+        <div class="panel-body">
+          <div id="users-loading" class="empty-state"><span class="spinner"></span></div>
+          <table id="users-table" style="display:none">
+            <thead>
+              <tr>
+                <th>GPID</th>
+                <th>Rol</th>
+                <th>Status</th>
+                <th></th>
+              </tr>
+            </thead>
+            <tbody id="users-tbody"></tbody>
+          </table>
+        </div>
+      </div>
+
+    </div>
+  </div>
+</div>
+
+<!-- ═══════════════════════════════════
+     MODAL: Add User
+═══════════════════════════════════ -->
+<div class="modal-overlay" id="modal-adduser">
+  <div class="modal">
+    <div class="modal-header">
+      <h3>Agregar Usuario</h3>
+      <button class="modal-close" onclick="closeAddUser()">✕</button>
+    </div>
+    <div class="modal-body">
+      <div id="modal-alert" class="alert"></div>
+      <div class="field">
+        <label for="new-gpid">GPID</label>
+        <div class="input-wrap">
+          <input type="text" id="new-gpid" maxlength="8" placeholder="12345678" inputmode="numeric">
+        </div>
+      </div>
+      <div class="field">
+        <label for="new-password">Contraseña</label>
+        <div class="input-wrap">
+          <input type="password" id="new-password" placeholder="Mínimo 6 caracteres">
+        </div>
+      </div>
+      <div class="field">
+        <label for="new-rol">Rol</label>
+        <select class="role-select" id="new-rol">
+          <option value="usuario">Usuario</option>
+          <option value="admin">Administrador</option>
+        </select>
+      </div>
+      <button class="btn-primary" onclick="handleAddUser()" style="margin-top:8px">
+        <span>Crear Usuario</span>
+      </button>
+    </div>
+  </div>
+</div>
+
+<!-- Toast notification -->
+<div class="toast" id="toast"></div>
+
+<script>
+// ══════════════════════════════════════════════════════
+// CONFIG
+// ══════════════════════════════════════════════════════
+const API = '/api';
+let authToken = null;
+let currentUser = null;
+let selectedTurno = null;
+let refreshInterval = null;
+let countdownIntervals = [];
+
+// ══════════════════════════════════════════════════════
+// UTILITIES
+// ══════════════════════════════════════════════════════
+function showView(viewId) {
+  document.querySelectorAll('.view').forEach(v => v.classList.remove('active'));
+  document.getElementById('view-' + viewId).classList.add('active');
+}
+
+function showToast(msg, type = 'success') {
+  const t = document.getElementById('toast');
+  t.textContent = msg;
+  t.className = 'toast toast-' + type + ' show';
+  setTimeout(() => { t.classList.remove('show'); }, 3500);
+}
+
+function showAlert(id, msg, type = 'error') {
+  const el = document.getElementById(id);
+  el.textContent = msg;
+  el.className = 'alert ' + type + ' visible';
+}
+
+function hideAlert(id) {
+  const el = document.getElementById(id);
+  if (el) el.className = 'alert';
+}
+
+function setLoading(btnId, textId, loading, text = '') {
+  const btn = document.getElementById(btnId);
+  const span = document.getElementById(textId);
+  btn.disabled = loading;
+  if (loading) {
+    span.innerHTML = '<span class="spinner"></span>';
+  } else {
+    span.textContent = text;
+  }
+}
+
+async function apiFetch(endpoint, options = {}) {
+  const headers = { 'Content-Type': 'application/json' };
+  if (authToken) headers['Authorization'] = 'Bearer ' + authToken;
+  const res = await fetch(API + endpoint, { ...options, headers });
+  const data = await res.json();
+  if (!res.ok) throw { status: res.status, data };
+  return data;
+}
+
+function formatDate(dt) {
+  if (!dt) return '—';
+  const d = new Date(dt);
+  return d.toLocaleDateString('es-MX', { day: '2-digit', month: '2-digit', year: 'numeric' });
+}
+
+function formatTime(dt) {
+  if (!dt) return '—';
+  const d = new Date(dt);
+  return d.toLocaleTimeString('es-MX', { hour: '2-digit', minute: '2-digit' });
+}
+
+// ══════════════════════════════════════════════════════
+// AUTH
+// ══════════════════════════════════════════════════════
+async function handleLogin() {
+  const gpid = document.getElementById('input-gpid').value.trim();
+  const password = document.getElementById('input-password').value;
+  hideAlert('login-alert');
+  document.getElementById('gpid-error').classList.remove('visible');
+  document.getElementById('pass-error').classList.remove('visible');
+
+  let valid = true;
+  if (!/^\d{8}$/.test(gpid)) {
+    document.getElementById('gpid-error').classList.add('visible');
+    valid = false;
+  }
+  if (!password) {
+    document.getElementById('pass-error').classList.add('visible');
+    valid = false;
+  }
+  if (!valid) return;
+
+  setLoading('btn-login', 'btn-login-text', true);
+
+  try {
+    const data = await apiFetch('/auth/login', {
+      method: 'POST',
+      body: JSON.stringify({ gpid, password })
+    });
+
+    authToken = data.token;
+    currentUser = data.user;
+    localStorage.setItem('gpid_token', authToken);
+
+    document.getElementById('input-gpid').value = '';
+    document.getElementById('input-password').value = '';
+
+    if (data.user.rol === 'admin') {
+      document.getElementById('admin-gpid-display').textContent = data.user.gpid;
+      showView('admin');
+      loadAdminData();
+      startAutoRefresh();
+    } else {
+      document.getElementById('user-gpid-display').textContent = data.user.gpid;
+      selectedTurno = null;
+      document.querySelectorAll('.turno-btn').forEach(b => b.classList.remove('selected'));
+      document.getElementById('input-hhc').value = '';
+      hideAlert('user-alert');
+      showView('user');
+    }
+  } catch (err) {
+    const errData = err.data || {};
+    if (errData.error === 'bloqueado') {
+      showAlert('login-alert',
+        `⚠ ${errData.message}`, 'warning');
+    } else {
+      showAlert('login-alert', errData.error || 'Error al iniciar sesión');
+    }
+  } finally {
+    setLoading('btn-login', 'btn-login-text', false, 'Entrar');
+  }
+}
+
+async function handleLogout() {
+  try {
+    if (authToken) await apiFetch('/auth/logout', { method: 'POST' });
+  } catch (e) {}
+  authToken = null;
+  currentUser = null;
+  localStorage.removeItem('gpid_token');
+  stopAutoRefresh();
+  clearCountdowns();
+  showView('login');
+  hideAlert('login-alert');
+}
+
+// Pressing Enter in login fields
+document.getElementById('input-gpid').addEventListener('keydown', e => {
+  if (e.key === 'Enter') document.getElementById('input-password').focus();
+});
+document.getElementById('input-password').addEventListener('keydown', e => {
+  if (e.key === 'Enter') handleLogin();
+});
+
+// Only allow digits in GPID fields
+document.getElementById('input-gpid').addEventListener('input', function() {
+  this.value = this.value.replace(/\D/g, '');
+});
+document.getElementById('new-gpid').addEventListener('input', function() {
+  this.value = this.value.replace(/\D/g, '');
+});
+
+// ══════════════════════════════════════════════════════
+// USER FORM
+// ══════════════════════════════════════════════════════
+function selectTurno(btn) {
+  document.querySelectorAll('.turno-btn').forEach(b => b.classList.remove('selected'));
+  btn.classList.add('selected');
+  selectedTurno = btn.dataset.turno;
+  document.getElementById('turno-error').classList.remove('visible');
+}
+
+async function handleSaveRecord() {
+  const hhc = document.getElementById('input-hhc').value.trim();
+  hideAlert('user-alert');
+  document.getElementById('hhc-error').classList.remove('visible');
+  document.getElementById('turno-error').classList.remove('visible');
+
+  let valid = true;
+  if (!hhc) {
+    document.getElementById('hhc-error').classList.add('visible');
+    valid = false;
+  }
+  if (!selectedTurno) {
+    document.getElementById('turno-error').classList.add('visible');
+    valid = false;
+  }
+  if (!valid) return;
+
+  setLoading('btn-save', 'btn-save-text', true);
+
+  try {
+    await apiFetch('/records', {
+      method: 'POST',
+      body: JSON.stringify({ hhc, turno: selectedTurno })
+    });
+
+    // Show success, then logout
+    showAlert('user-alert', '✓ Registro guardado correctamente. Cerrando sesión...', 'success');
+
+    setTimeout(async () => {
+      await handleLogout();
+      showAlert('login-alert', 'Registro guardado. Tu cuenta está bloqueada por 10 minutos.', 'warning');
+    }, 2000);
+
+  } catch (err) {
+    const errData = err.data || {};
+    showAlert('user-alert', errData.error || 'Error al guardar el registro');
+    setLoading('btn-save', 'btn-save-text', false, 'Guardar Registro');
+  }
+}
+
+// ══════════════════════════════════════════════════════
+// ADMIN PANEL
+// ══════════════════════════════════════════════════════
+async function loadAdminData() {
+  loadRecords();
+  loadUsers();
+}
+
+async function loadRecords() {
+  document.getElementById('records-loading').style.display = 'block';
+  document.getElementById('records-table').style.display = 'none';
+  document.getElementById('records-empty').style.display = 'none';
+
+  try {
+    const data = await apiFetch('/admin/records');
+    const records = data.records || [];
+
+    document.getElementById('stat-total').textContent = records.length;
+
+    const today = new Date().toLocaleDateString('en-CA');
+    const todayCount = records.filter(r => r.fecha === today).length;
+    document.getElementById('stat-today').textContent = todayCount;
+
+    const tbody = document.getElementById('records-tbody');
+    tbody.innerHTML = '';
+
+    if (records.length === 0) {
+      document.getElementById('records-loading').style.display = 'none';
+      document.getElementById('records-empty').style.display = 'block';
+      return;
+    }
+
+    records.forEach(r => {
+      const tr = document.createElement('tr');
+      const dt = new Date(r.fecha_hora);
+      tr.innerHTML = `
+        <td class="td-gpid">${r.gpid}</td>
+        <td>${r.hhc}</td>
+        <td class="td-turno">${r.turno}</td>
+        <td>${formatDate(r.fecha_hora)}</td>
+        <td>${formatTime(r.fecha_hora)}</td>
+      `;
+      tbody.appendChild(tr);
+    });
+
+    document.getElementById('records-loading').style.display = 'none';
+    document.getElementById('records-table').style.display = 'table';
+
+  } catch (err) {
+    document.getElementById('records-loading').innerHTML = '<p style="font-family:var(--mono);font-size:12px;color:var(--danger)">Error al cargar registros</p>';
+  }
+}
+
+function clearCountdowns() {
+  countdownIntervals.forEach(clearInterval);
+  countdownIntervals = [];
+}
+
+async function loadUsers() {
+  document.getElementById('users-loading').style.display = 'block';
+  document.getElementById('users-table').style.display = 'none';
+  clearCountdowns();
+
+  try {
+    const data = await apiFetch('/admin/users');
+    const users = data.users || [];
+
+    document.getElementById('stat-blocked').textContent =
+      users.filter(u => u.status === 'Bloqueado').length;
+
+    const tbody = document.getElementById('users-tbody');
+    tbody.innerHTML = '';
+
+    users.forEach(u => {
+      const tr = document.createElement('tr');
+      const isAdmin = u.rol === 'Administrador';
+
+      let statusCell = '';
+      if (u.status === 'Bloqueado') {
+        const countdownId = 'cd-' + u.gpid;
+        statusCell = `<td><span class="badge badge-blocked">Bloqueado</span> <span class="countdown" id="${countdownId}"></span></td>`;
+
+        // Start countdown
+        const endTime = new Date(u.blockedUntil).getTime();
+        const interval = setInterval(() => {
+          const el = document.getElementById(countdownId);
+          if (!el) { clearInterval(interval); return; }
+          const left = Math.max(0, endTime - Date.now());
+          const mins = Math.floor(left / 60000);
+          const secs = Math.floor((left % 60000) / 1000);
+          if (left === 0) {
+            el.textContent = '';
+            el.closest('td').querySelector('.badge').className = 'badge badge-available';
+            el.closest('td').querySelector('.badge').textContent = 'Disponible';
+            clearInterval(interval);
+          } else {
+            el.textContent = `${mins}:${secs.toString().padStart(2,'0')}`;
+          }
+        }, 1000);
+        countdownIntervals.push(interval);
+      } else if (isAdmin) {
+        statusCell = `<td><span class="badge badge-admin">Admin</span></td>`;
+      } else {
+        statusCell = `<td><span class="badge badge-available">Disponible</span></td>`;
+      }
+
+      const rolBadge = isAdmin
+        ? `<span class="badge badge-admin">Admin</span>`
+        : `<span style="font-family:var(--mono);font-size:11px;color:var(--text2)">Usuario</span>`;
+
+      const actionBtn = u.status === 'Bloqueado'
+        ? `<button class="btn-small btn-success-sm" onclick="unblockUser('${u.gpid}')">Desbloquear</button>`
+        : (!isAdmin ? `<button class="btn-small btn-danger-sm" onclick="deleteUser('${u.gpid}')">✕</button>` : '');
+
+      tr.innerHTML = `
+        <td class="td-gpid">${u.gpid}</td>
+        <td>${rolBadge}</td>
+        ${statusCell}
+        <td>${actionBtn}</td>
+      `;
+      tbody.appendChild(tr);
+    });
+
+    document.getElementById('users-loading').style.display = 'none';
+    document.getElementById('users-table').style.display = 'table';
+
+  } catch (err) {
+    document.getElementById('users-loading').innerHTML = '<p style="font-family:var(--mono);font-size:12px;color:var(--danger)">Error al cargar usuarios</p>';
+  }
+}
+
+async function unblockUser(gpid) {
+  try {
+    await apiFetch(`/admin/users/${gpid}/unblock`, { method: 'PATCH' });
+    showToast(`Usuario ${gpid} desbloqueado`);
+    loadUsers();
+  } catch (err) {
+    showToast('Error al desbloquear usuario', 'error');
+  }
+}
+
+async function deleteUser(gpid) {
+  if (!confirm(`¿Eliminar al usuario ${gpid}?`)) return;
+  try {
+    await apiFetch(`/admin/users/${gpid}`, { method: 'DELETE' });
+    showToast(`Usuario ${gpid} eliminado`);
+    loadAdminData();
+  } catch (err) {
+    showToast(err.data?.error || 'Error al eliminar usuario', 'error');
+  }
+}
+
+// ── Add user modal ──
+function openAddUser() {
+  document.getElementById('new-gpid').value = '';
+  document.getElementById('new-password').value = '';
+  document.getElementById('new-rol').value = 'usuario';
+  hideAlert('modal-alert');
+  document.getElementById('modal-adduser').classList.add('open');
+}
+
+function closeAddUser() {
+  document.getElementById('modal-adduser').classList.remove('open');
+}
+
+async function handleAddUser() {
+  const gpid = document.getElementById('new-gpid').value.trim();
+  const password = document.getElementById('new-password').value;
+  const rol = document.getElementById('new-rol').value;
+  hideAlert('modal-alert');
+
+  if (!/^\d{8}$/.test(gpid)) {
+    showAlert('modal-alert', 'El GPID debe ser exactamente 8 dígitos');
+    return;
+  }
+  if (password.length < 6) {
+    showAlert('modal-alert', 'La contraseña debe tener al menos 6 caracteres');
+    return;
+  }
+
+  try {
+    await apiFetch('/admin/users', {
+      method: 'POST',
+      body: JSON.stringify({ gpid, password, rol })
+    });
+    closeAddUser();
+    showToast('Usuario creado correctamente');
+    loadAdminData();
+  } catch (err) {
+    showAlert('modal-alert', err.data?.error || 'Error al crear usuario');
+  }
+}
+
+// Close modal on overlay click
+document.getElementById('modal-adduser').addEventListener('click', function(e) {
+  if (e.target === this) closeAddUser();
+});
+
+// ── Auto refresh ──
+function startAutoRefresh() {
+  refreshInterval = setInterval(loadUsers, 30000);
+}
+
+function stopAutoRefresh() {
+  if (refreshInterval) clearInterval(refreshInterval);
+}
+
+// ══════════════════════════════════════════════════════
+// INIT: Check for existing session
+// ══════════════════════════════════════════════════════
+async function checkSession() {
+  const token = localStorage.getItem('gpid_token');
+  if (!token) return;
+
+  authToken = token;
+  try {
+    const data = await apiFetch('/auth/me');
+    currentUser = data;
+    if (data.rol === 'admin') {
+      document.getElementById('admin-gpid-display').textContent = data.gpid;
+      showView('admin');
+      loadAdminData();
+      startAutoRefresh();
+    } else {
+      document.getElementById('user-gpid-display').textContent = data.gpid;
+      showView('user');
+    }
+  } catch (e) {
+    authToken = null;
+    localStorage.removeItem('gpid_token');
+  }
+}
+
+checkSession();
+</script>
+</body>
+</html>
