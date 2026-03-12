@@ -3,6 +3,7 @@ const bcrypt = require('bcryptjs');
 const router = express.Router();
 const { dbGet, dbRun } = require('../database/db');
 const { generateToken, requireAuth } = require('../middleware/auth');
+const { nowTijuana } = require('../database/db');
 
 function validateGPID(gpid) {
   return /^\d{8}$/.test(gpid);
@@ -46,17 +47,18 @@ router.post('/login', async (req, res) => {
       return res.status(401).json({ error: 'GPID o contraseña incorrectos' });
     }
 
+    // Registrar último acceso en hora Tijuana
     await dbRun(
-      "UPDATE usuarios SET ultimo_acceso = datetime('now') WHERE gpid = ?",
-      [gpid]
+      'UPDATE usuarios SET ultimo_acceso = ? WHERE gpid = ?',
+      [nowTijuana(), gpid]
     );
 
     const expiresAt = new Date(Date.now() + 8 * 60 * 60 * 1000).toISOString();
     const { token, tokenId } = generateToken({ gpid: user.gpid, rol: user.rol });
 
     await dbRun(
-      'INSERT INTO sesiones (gpid, token_id, expira_en) VALUES (?, ?, ?)',
-      [user.gpid, tokenId, expiresAt]
+      'INSERT INTO sesiones (gpid, token_id, creado_en, expira_en) VALUES (?, ?, ?, ?)',
+      [user.gpid, tokenId, nowTijuana(), expiresAt]
     );
 
     res.json({
