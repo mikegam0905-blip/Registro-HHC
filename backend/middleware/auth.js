@@ -1,113 +1,61 @@
-const express = require('express');
-const bcrypt = require('bcryptjs');
-const router = express.Router();
-const { dbGet, dbRun } = require('../database/db');
-const { generateToken, requireAuth } = require('../middleware/auth');
+const jwt = require('jsonwebtoken');
+const { dbGet } = require('../database/db');
 
-// Validate GPID format: exactly 8 digits
-function validateGPID(gpid) {
-  return /^\d{8}$/.test(gpid);
+const JWT_SECRET = process.env.JWT_SECRET || 'change-this-secret-in-production-min-32-chars!!';
+
+function generateToken(payload) {
+  const { v4: uuidv4 } = require('uuid');
+  const tokenId = uuidv4();
+  const token = jwt.sign(
+    { ...payload, jti: tokenId },
+    JWT_SECRET,
+    { expiresIn: '8h' }
+  );
+  return { token, tokenId };
 }
 
-// POST /api/auth/login
-router.post('/login', async (req, res) => {
+function verifyToken(token) {
+  return jwt.verify(token, JWT_SECRET);
+}
+
+async function requireAuth(req, res, next) {
   try {
-    const { gpid, password } = req.body;
-
-    // Validate inputs
-    if (!gpid || !password) {
-      return res.status(400).json({ error: 'GPID y contraseña son requeridos' });
+    const authHeader = req.headers.authorization;
+    if (!authHeader || !authHeader.startsWith('Bearer ')) {
+      return res.status(401).json({ error: 'Token requerido' });
     }
 
-    if (!validateGPID(gpid)) {
-      return res.status(400).json({ error: 'El GPID debe ser exactamente 8 dígitos numéricos' });
-    }
+    const token = authHeader.split(' ')[1];
+    const decoded = verifyToken(token);
 
-    // Find user
-    const user = await dbGet('SELECT * FROM usuarios WHERE gpid = ?', [gpid]);
-    if (!user) {
-      return res.status(401).json({ error: 'GPID o contraseña incorrectos' });
-    }
-
-    // Check if user is blocked (only for normal users)
-    if (user.rol === 'usuario' && user.bloqueado_hasta) {
-      const blockedUntil = new Date(user.bloqueado_hasta);
-      const now = new Date();
-      if (blockedUntil > now) {
-        const minutesLeft = Math.ceil((blockedUntil - now) / 60000);
-        return res.status(403).json({
-          error: 'bloqueado',
-          message: `Tu cuenta está temporalmente bloqueada. Intenta nuevamente en ${minutesLeft} minuto${minutesLeft !== 1 ? 's' : ''}.`,
-          minutesLeft,
-          blockedUntil: blockedUntil.toISOString()
-        });
-      } else {
-        // Unblock user if time has passed
-        await dbRun('UPDATE usuarios SET bloqueado_hasta = NULL WHERE gpid = ?', [gpid]);
-      }
-    }
-
-    // Verify password
-    const validPassword = await bcrypt.compare(password, user.password);
-    if (!validPassword) {
-      return res.status(401).json({ error: 'GPID o contraseña incorrectos' });
-    }
-
-    // Update last access
-    await dbRun(
-      "UPDATE usuarios SET ultimo_acceso = datetime('now') WHERE gpid = ?",
-      [gpid]
+    const session = await dbGet(
+      'SELECT * FROM sesiones WHERE token_id = ? AND activa = 1',
+      [decoded.jti]
     );
 
-    // Generate token
-    const expiresAt = new Date(Date.now() + 8 * 60 * 60 * 1000).toISOString();
-    const { token, tokenId } = generateToken({ gpid: user.gpid, rol: user.rol });
+    if (!session) {
+      return res.status(401).json({ error: 'Sesión inválida o expirada' });
+    }
 
-    // Save session
-    await dbRun(
-      'INSERT INTO sesiones (gpid, token_id, expira_en) VALUES (?, ?, ?)',
-      [user.gpid, tokenId, expiresAt]
-    );
+    if (new Date(session.expira_en) < new Date()) {
+      await dbGet('UPDATE sesiones SET activa = 0 WHERE token_id = ?', [decoded.jti]);
+      return res.status(401).json({ error: 'Sesión expirada' });
+    }
 
-    res.json({
-      success: true,
-      token,
-      user: {
-        gpid: user.gpid,
-        rol: user.rol
-      }
-    });
+    req.user = decoded;
+    next();
   } catch (err) {
-    console.error('Login error:', err);
-    res.status(500).json({ error: 'Error interno del servidor' });
+    return res.status(401).json({ error: 'Token inválido' });
   }
-});
+}
 
-// POST /api/auth/logout
-router.post('/logout', requireAuth, async (req, res) => {
-  try {
-    await dbRun(
-      'UPDATE sesiones SET activa = 0 WHERE token_id = ?',
-      [req.user.jti]
-    );
-    res.json({ success: true, message: 'Sesión cerrada correctamente' });
-  } catch (err) {
-    res.status(500).json({ error: 'Error al cerrar sesión' });
-  }
-});
+async function requireAdmin(req, res, next) {
+  await requireAuth(req, res, () => {
+    if (req.user.rol !== 'admin') {
+      return res.status(403).json({ error: 'Acceso denegado. Se requiere rol de administrador.' });
+    }
+    next();
+  });
+}
 
-// GET /api/auth/me - verify current session
-router.get('/me', requireAuth, async (req, res) => {
-  try {
-    const user = await dbGet(
-      'SELECT gpid, rol, bloqueado_hasta FROM usuarios WHERE gpid = ?',
-      [req.user.gpid]
-    );
-    if (!user) return res.status(404).json({ error: 'Usuario no encontrado' });
-    res.json({ gpid: user.gpid, rol: user.rol });
-  } catch (err) {
-    res.status(500).json({ error: 'Error interno' });
-  }
-});
-
-module.exports = router;
+module.exports = { generateToken, verifyToken, requireAuth, requireAdmin };
